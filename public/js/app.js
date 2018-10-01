@@ -7,8 +7,20 @@
 var CreateCanvas = function() {
   document.body.style.margin = '0';
 
+  RED_BOX = new Image();
+  RED_BOX.src = '/img/box-red.png';
+
+  BLUE_BOX = new Image();
+  BLUE_BOX.src = '/img/box-blue.png';
+
+  YELLOW_BOX = new Image();
+  YELLOW_BOX.src = '/img/box-yellow.png';
+
+  GREEN_BOX = new Image();
+  GREEN_BOX.src = '/img/box-green.png';
+
   var c = document.createElement('canvas');
-  c.height = window.innerHeight;
+  c.height = window.innerHeight - 40;
   c.width = 480;
 
   c.style.display = 'block';
@@ -29,7 +41,7 @@ class Box {
 
   getYTop() {
     var state = State.Get();
-    var yFactor = 0.2;
+    var yFactor = 0.1;
     return state.progress * yFactor - this.offset * 120;
   }
 
@@ -42,28 +54,45 @@ class Box {
    * @param {CanvasRenderingContext2D} ctx
    */
   Draw(ctx) {
-    var fillStyle = '';
+    if (this.slot === 0) {
+      return;
+    }
+
+    var image = null;
     switch (this.slot) {
-      case 0:
-        fillStyle = '#ff3300';
-        break;
       case 1:
-        fillStyle = '#0033ff';
+        image = RED_BOX;
         break;
       case 2:
-        fillStyle = '#ffdd00';
+        image = BLUE_BOX;
         break;
       case 3:
-        fillStyle = '#00dd66';
+        image = YELLOW_BOX;
         break;
+      case 4:
+        image = GREEN_BOX;
+        break;
+    }
+
+    if (this.getYBottom() > C.height - 60 && !this.scored) {
+      this.scored = true;
+      State.Update({
+        type: 'ADD_TO_SCORE',
+        data: {
+          addition: -9
+        }
+      });
     }
 
     if (this.getYBottom() < 0 || this.getYTop() > C.height) {
       return;
     }
 
-    ctx.fillStyle = fillStyle;
-    ctx.fillRect(80 + 80 * this.slot, this.getYTop(), 80, 80);
+    if (this.scored) {
+      ctx.globalAlpha = 0.5;
+    }
+    ctx.drawImage(image, 80 * this.slot, this.getYTop(), 80, 80);
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -78,26 +107,27 @@ class Box {
 
     if (
       !(
-        (e.key === 'a' && this.slot === 0) ||
-        (e.key === 's' && this.slot === 1) ||
-        (e.key === 'd' && this.slot === 2) ||
-        (e.key === 'f' && this.slot === 3)
+        (e.key === 'a' && this.slot === 1) ||
+        (e.key === 's' && this.slot === 2) ||
+        (e.key === 'd' && this.slot === 3) ||
+        (e.key === 'f' && this.slot === 4)
       )
     ) {
-      return;
+      return 0;
     }
 
     var finishLine = C.height - 80;
     var bottom = this.getYBottom();
 
-    var close = bottom - finishLine;
-    if (Math.abs(close) > 20) {
+    var close = Math.abs(bottom - finishLine);
+    if (close > 20) {
       return 0;
     }
 
     this.scored = true;
 
-    return Math.floor(20 - Math.abs(close));
+    var score = Math.floor(10 - close);
+    return score;
   }
 }
 
@@ -133,7 +163,7 @@ var StateInterface = function() {
   for (var i = 0; i < 255; i++) {
     state.boxes.push(
       new Box({
-        slot: Math.floor(Math.random() * 4),
+        slot: Math.floor(Math.random() * 5),
         offset: i
       })
     );
@@ -164,7 +194,11 @@ var StateInterface = function() {
           state.progress = Date.now() - startTime;
           break;
         case 'ADD_TO_SCORE':
-          state.score += action.data.addition;
+          if (action.data.addition < 0) {
+            state.score = Math.max(-40, state.score + action.data.addition);
+          } else {
+            state.score = Math.min(40, state.score + action.data.addition);
+          }
           break;
       }
 
@@ -194,6 +228,8 @@ var StateInterface = function() {
 var State = StateInterface();
 
 var StartAnimationLoop = function() {
+  var a = new Audio('/music/song-2.mp3');
+
   var ctx = C.getContext('2d');
 
   var drawBackground = function() {
@@ -201,8 +237,20 @@ var StartAnimationLoop = function() {
     ctx.fillRect(0, 0, C.width, C.height);
 
     // finish line
-    ctx.fillStyle = '#ff0000';
+    ctx.fillStyle = '#00ff00';
     ctx.fillRect(0, C.height - 80, C.width, 1);
+
+    ctx.fillStyle = '#dddd00';
+    ctx.fillRect(0, C.height - 70, C.width, 1);
+
+    ctx.fillStyle = '#dddd00';
+    ctx.fillRect(0, C.height - 90, C.width, 1);
+
+    ctx.fillStyle = '#ffaaaa';
+    ctx.fillRect(0, C.height - 60, C.width, 1);
+
+    ctx.fillStyle = '#ffaaaa';
+    ctx.fillRect(0, C.height - 100, C.width, 1);
   };
 
   var drawSquares = function() {
@@ -217,6 +265,9 @@ var StartAnimationLoop = function() {
     State.Update({type: 'PROGRESS_UPDATE'});
   };
 
+  var gameOver = false;
+  var stop = false;
+
   var theLoop = function() {
     window.requestAnimationFrame(() => {
       updateProgress();
@@ -225,51 +276,144 @@ var StartAnimationLoop = function() {
       drawBackground();
       drawSquares();
 
-      if (document.visibilityState !== 'hidden') {
+      if (!stop) {
         theLoop();
       }
     });
   };
 
-  theLoop();
+  a.addEventListener('canplaythrough', e => {
+    a.play();
+    theLoop();
+  });
+
+  document.addEventListener('visibilitychange', e => {
+    if (document.visibilityState === 'hidden' && !gameOver) {
+      stop = true;
+      a.pause();
+    } else {
+      stop = false;
+      a.play();
+    }
+  });
+
+  State.Subscribe(() => {
+    var state = State.Get();
+    if (state.score === -40) {
+      stop = true;
+      gameOver = true;
+      a.pause();
+    }
+  });
+};
+
+var findClosestBox = function() {
+  var state = State.Get();
+
+  var finishLineY = C.height - 80;
+
+  for (var i = 0; i < state.boxes.length; i++) {
+    if (state.boxes[i].slot === 0) {
+      continue;
+    }
+    var distance = state.boxes[i].getYBottom() - finishLineY;
+
+    if (distance > -30 && distance < 30) {
+      return state.boxes[i];
+    }
+  }
+
+  return new Box({
+    slot: 0,
+    offset: Infinity
+  });
 };
 
 var WaitForInput = function() {
   window.addEventListener('keydown', function(e) {
     if (e.key === 'a' || e.key === 's' || e.key === 'd' || e.key === 'f') {
       var state = State.Get();
-      state.boxes.forEach(box => {
-        var score = box.Score(e);
 
-        if (score > 0) {
-          State.Update({
-            type: 'ADD_TO_SCORE',
-            data: {
-              addition: score
-            }
-          });
+      var box = findClosestBox();
+      var score = box.Score(e);
+      console.log(score);
+
+      if (score !== 0) {
+        if (score >= 8) {
+          var ding = new Audio('/music/good-score.mp3');
+          ding.play();
         }
-      });
+
+        if (score < 0) {
+          var womp = new Audio('/music/bad-score.mp3');
+          womp.play();
+        }
+
+        State.Update({
+          type: 'ADD_TO_SCORE',
+          data: {
+            addition: score
+          }
+        });
+      }
     }
   });
 };
 
 var DrawScore = function() {
   var state = State.Get();
-  var score = document.createElement('div');
-  score.style.position = 'fixed';
-  score.style.top = '20px';
-  score.style.left = '20px';
-  score.style.font = '48px Arial';
-  score.textContent = state.score.toString();
 
-  document.getElementById('app').appendChild(score);
+  var ticker = document.createElement('div');
+  ticker.style.position = 'fixed';
+  ticker.style.bottom = '0';
+  ticker.style.left = '50%';
+  ticker.style.width = '480px';
+  ticker.style.height = '40px';
+  ticker.style.marginLeft = '-240px';
+  ticker.style.background =
+    'linear-gradient(to right, rgba(255,50,50,1) 0%,rgba(255,225,0,1) 50%,rgba(255,225,0,1) 51%,rgba(45,255,101,1) 100%)';
+
+  var marker = document.createElement('div');
+  marker.style.border = 'solid 8px white';
+  marker.style.width = '40px';
+  marker.style.height = '40px';
+  marker.style.position = 'absolute';
+  marker.style.borderRadius = '40px';
+  marker.style.left = '50%';
+  marker.style.marginLeft = '-20px';
+  marker.style.transition = 'left 0.2s ease-in-out';
+  ticker.appendChild(marker);
+
+  document.getElementById('app').appendChild(ticker);
 
   State.Subscribe(function() {
     var state = State.Get();
-    score.textContent = state.score;
+
+    marker.style.left = (state.score * 1.25 + 50).toString() + '%';
+
+    if (state.score === -40) {
+      var gameOver = document.createElement('div');
+      gameOver.style.boxSizing = 'border-box';
+      gameOver.style.position = 'fixed';
+      gameOver.style.left = '0';
+      gameOver.style.top = '0';
+      gameOver.style.width = '100%';
+      gameOver.style.height = '100%';
+      gameOver.style.zIndex = '10';
+      gameOver.style.background = 'rgba(0,0,0,0.75)';
+      gameOver.style.font = 'bold 48px arial';
+      gameOver.style.padding = '10vh 10vw';
+      gameOver.style.textAlign = 'center';
+      gameOver.style.color = 'white';
+
+      gameOver.textContent = 'GAME OVER';
+
+      document.getElementById('app').appendChild(gameOver);
+    }
   });
 };
+
+var RED_BOX, BLUE_BOX, GREEN_BOX, YELLOW_BOX;
 
 var C = CreateCanvas();
 DrawScore();
