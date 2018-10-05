@@ -237,20 +237,10 @@ var StartAnimationLoop = function() {
     ctx.fillRect(0, 0, C.width, C.height);
 
     // finish line
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(0, C.height - 80, C.width, 1);
-
-    ctx.fillStyle = '#dddd00';
-    ctx.fillRect(0, C.height - 70, C.width, 1);
-
-    ctx.fillStyle = '#dddd00';
-    ctx.fillRect(0, C.height - 90, C.width, 1);
-
-    ctx.fillStyle = '#ffaaaa';
-    ctx.fillRect(0, C.height - 60, C.width, 1);
-
-    ctx.fillStyle = '#ffaaaa';
-    ctx.fillRect(0, C.height - 100, C.width, 1);
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, C.height - 160, C.width, 80);
+    ctx.globalAlpha = 1;
   };
 
   var drawSquares = function() {
